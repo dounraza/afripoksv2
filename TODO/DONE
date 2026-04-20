@@ -1,0 +1,17 @@
+# ⚙️ Backend MVP Tasks
+
+- [ ] Initialize Node.js project (`npm init`).
+- [ ] Install dependencies: `express`, `socket.io`, `cors`, `nodemon`.
+- [ ] Setup basic Express server with Socket.io integration.
+- [ ] Implement `Room` / `Table` management (multi-player support).
+- [ ] **Socket Events**:
+    - [ ] `joinTable`: Add player to a specific table.
+    - [ ] `leaveTable`: Remove player and cleanup state.
+    - [ ] `playerAction`: Receive Fold/Call/Raise from client.
+- [ ] **Game Loop**:
+    - [ ] Manage turns (whose turn is it?).
+    - [ ] Transition between phases (Pre-flop, Flop, Turn, River, Showdown).
+    - [ ] Handle timeouts (auto-fold/check).
+- [ ] **State Synchronization**:
+    - [ ] Broadcast table state to all players on every change.
+    - [ ] Ensure private data (other players' cards) is NOT sent.
