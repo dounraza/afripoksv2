@@ -18,6 +18,7 @@ export class Table {
     this.currentPlayerIndex = -1;
     this.currentPhase = 'pre-flop';
     this.onUpdate = null;
+    this.onHandEnd = null; // Callback pour persister en DB
     this.winnerInfo = null;
     this.turnTimer = null;
     this.currentBet = this.bigBlind; 
@@ -25,6 +26,10 @@ export class Table {
 
   setUpdateCallback(cb) {
     this.onUpdate = cb;
+  }
+
+  setHandEndCallback(cb) {
+    this.onHandEnd = cb;
   }
 
   notify() {
@@ -61,10 +66,20 @@ export class Table {
   }
 
   removePlayer(id) {
-    this.players = this.players.filter(p => p.id !== id);
+    const playerIndex = this.players.findIndex(p => p.id === id);
+    if (playerIndex === -1) return null;
+    
+    const player = this.players[playerIndex];
+    const chipsToReturn = player.chips + (player.bet || 0);
+    const playerName = player.name;
+
+    this.players.splice(playerIndex, 1);
+    
     if (this.players.length < 2) {
       this.gameState = 'waiting';
     }
+    
+    return { name: playerName, chips: chipsToReturn };
   }
 
   createDeck() {
@@ -367,6 +382,10 @@ export class Table {
 
     this.gameState = 'showdown';
     this.notify();
+
+    if (this.onHandEnd) {
+      this.onHandEnd(this.players.map(p => ({ name: p.name, chips: p.chips })));
+    }
 
     setTimeout(() => {
       this.gameState = 'waiting';

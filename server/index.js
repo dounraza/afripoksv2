@@ -46,6 +46,13 @@ function broadcastTableState(table) {
   });
 }
 
+function setupTableCallbacks(table) {
+  if (!table) return;
+  if (!table.onUpdate) {
+    table.setUpdateCallback(() => broadcastTableState(table));
+  }
+}
+
 io.on('connection', (socket) => {
   console.log('Un joueur s\'est connecté :', socket.id);
 
@@ -54,7 +61,7 @@ io.on('connection', (socket) => {
 
     if (!table) {
       try {
-        const tableData = await TablePoker.findOne({ where: { name: tableId } });
+        const tableData = await TablePoker.findByPk(tableId);
         if (tableData) {
           table = tableManager.createTable(tableId, {
             smallBlind: parseFloat(tableData.smallBlind),
@@ -62,12 +69,17 @@ io.on('connection', (socket) => {
             minBuyIn: parseFloat(tableData.cave)
           });
           console.log(`Nouvelle table logique créée : ${tableId}`);
+          setupTableCallbacks(table); // Configurer les callbacks pour la nouvelle table
         } else if (tableId === 'default-table') {
           table = tableManager.getTable('default-table');
+          setupTableCallbacks(table); // Configurer les callbacks pour la table par défaut
         }
       } catch (err) {
         console.error('Erreur lors de la recherche de la table:', err);
       }
+    } else {
+      // Si la table existe déjà, s'assurer que les callbacks sont définis
+      setupTableCallbacks(table);
     }
 
     if (!table) {
@@ -143,10 +155,30 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('leaveTable', ({ tableId }) => {
+  const returnChipsToUser = async (playerName, chips) => {
+    if (chips <= 0) return;
+    try {
+      const user = await User.findOne({
+        where: { name: playerName },
+        include: [{ model: Solde }]
+      });
+      if (user && user.Solde) {
+        user.Solde.montant = parseFloat(user.Solde.montant) + chips;
+        await user.Solde.save();
+        console.log(`Jetons retournés à ${playerName}: +${chips} MGA (Nouveau: ${user.Solde.montant})`);
+      }
+    } catch (err) {
+      console.error(`Erreur lors du retour des jetons pour ${playerName}:`, err);
+    }
+  };
+
+  socket.on('leaveTable', async ({ tableId }) => {
     const table = tableManager.getTable(tableId);
     if (table) {
-      table.removePlayer(socket.id);
+      const result = table.removePlayer(socket.id);
+      if (result) {
+        await returnChipsToUser(result.name, result.chips);
+      }
       socket.leave(tableId);
       console.log(`Joueur ${socket.id} a quitté la table ${tableId}`);
       io.to(tableId).emit('tableUpdated', table.getStateForPlayer(null));
@@ -165,12 +197,16 @@ io.on('connection', (socket) => {
     broadcastTableState(table);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log('Joueur déconnecté :', socket.id);
-    tableManager.getAllTables().forEach(table => {
-      table.removePlayer(socket.id);
-      io.to(table.id).emit('tableUpdated', table.getStateForPlayer(null));
-    });
+    const tables = tableManager.getAllTables();
+    for (const table of tables) {
+      const result = table.removePlayer(socket.id);
+      if (result) {
+        await returnChipsToUser(result.name, result.chips);
+        io.to(table.id).emit('tableUpdated', table.getStateForPlayer(null));
+      }
+    }
   });
 });
 
