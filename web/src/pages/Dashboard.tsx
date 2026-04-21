@@ -66,7 +66,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onJoinTable, user, onLogou
   const slides = [
     { title: 'COIN REWARDS', desc: 'Gagnez des jetons en jouant', img: '/image/4.jpg' },
     { title: 'BONUS WEEKEND', desc: 'Jusqu\'à 200% de bonus', img: '/image/Poker_hero.png' },
-    { title: 'TOURNOI MENSUEL', desc: 'Gagnez le ticket d\'or', img: '/image/poker.jpg' },
+    { title: 'TOURNOI MENSUEL', desc: 'jouer pour gagner', img: '/image/poker.jpg' },
     { title: 'DAILY JACKPOT', desc: 'Tentez votre chance chaque jour', img: '/image/re.jfif' }
   ];
 
