@@ -44,6 +44,18 @@ function broadcastTableState(table) {
   table.players.forEach(p => {
     io.to(p.id).emit('tableUpdated', table.getStateForPlayer(p.id));
   });
+  // Also notify the lobby about the updated player count
+  broadcastLobbyUpdate();
+}
+
+function broadcastLobbyUpdate() {
+  const tables = tableManager.getAllTables();
+  const updateData = tables.map(t => ({
+    id: t.id,
+    currentPlayers: t.players.length,
+    playerNames: t.players.map(p => p.name)
+  }));
+  io.emit('lobbyUpdate', updateData);
 }
 
 function setupTableCallbacks(table) {
@@ -61,33 +73,33 @@ io.on('connection', (socket) => {
   console.log('Un joueur s\'est connecté :', socket.id, 'Total:', onlinePlayers);
 
   socket.on('joinTable', async ({ tableId, playerName, buyIn }) => {
-    let table = tableManager.getTable(tableId);
+    const sTableId = String(tableId);
+    let table = tableManager.getTable(sTableId);
 
     if (!table) {
       try {
-        const tableData = await TablePoker.findByPk(tableId);
+        const tableData = await TablePoker.findByPk(sTableId);
         if (tableData) {
-          table = tableManager.createTable(tableId, {
+          table = tableManager.createTable(sTableId, {
             smallBlind: parseFloat(tableData.smallBlind),
             bigBlind: parseFloat(tableData.bigBlind),
             minBuyIn: parseFloat(tableData.cave)
           });
-          console.log(`Nouvelle table logique créée : ${tableId}`);
-          setupTableCallbacks(table); // Configurer les callbacks pour la nouvelle table
-        } else if (tableId === 'default-table') {
+          console.log(`Nouvelle table logique créée : ${sTableId}`);
+          setupTableCallbacks(table); 
+        } else if (sTableId === 'default-table') {
           table = tableManager.getTable('default-table');
-          setupTableCallbacks(table); // Configurer les callbacks pour la table par défaut
+          setupTableCallbacks(table); 
         }
       } catch (err) {
         console.error('Erreur lors de la recherche de la table:', err);
       }
     } else {
-      // Si la table existe déjà, s'assurer que les callbacks sont définis
       setupTableCallbacks(table);
     }
 
     if (!table) {
-      console.log(`Table non trouvée: ${tableId}`);
+      console.log(`Table non trouvée: ${sTableId}`);
       return socket.emit('error', { message: 'Table non trouvée' });
     }
 
@@ -164,9 +176,13 @@ io.on('connection', (socket) => {
       }
 
       socket.join(tableId);
-      console.log(`${playerName} a rejoint la table ${tableId}`);
+      console.log(`${playerName} a rejoint la table ${tableId}. Joueurs actuels: ${table.players.length}`);
 
-      io.to(tableId).emit('tableUpdated', table.getStateForPlayer(null));
+      // Notification CRITIQUE pour le lobby
+      broadcastLobbyUpdate();
+      
+      // Notification pour la table
+      broadcastTableState(table);
 
       if (table.players.length >= 2 && table.gameState === 'waiting') {
         table.startHand();
@@ -204,7 +220,7 @@ io.on('connection', (socket) => {
       }
       socket.leave(tableId);
       console.log(`Joueur ${socket.id} a quitté la table ${tableId}`);
-      io.to(tableId).emit('tableUpdated', table.getStateForPlayer(null));
+      broadcastTableState(table);
     }
   });
 
@@ -237,7 +253,7 @@ io.on('connection', (socket) => {
       const result = table.removePlayer(socket.id);
       if (result) {
         await returnChipsToUser(result.name, result.chips);
-        io.to(table.id).emit('tableUpdated', table.getStateForPlayer(null));
+        broadcastTableState(table);
       }
     }
   });

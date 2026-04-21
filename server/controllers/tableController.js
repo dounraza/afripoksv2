@@ -7,10 +7,12 @@ export const getTables = async (req, res) => {
     
     // Enrich table data with real-time player counts
     const enrichedTables = tables.map(table => {
-      const activeTable = tableManager.getTable(table.id);
+      // Forcer l'ID en string pour correspondre aux clés de tableManager
+      const activeTable = tableManager.getTable(String(table.id));
       return {
         ...table.toJSON(),
-        currentPlayers: activeTable ? activeTable.players.length : 0
+        currentPlayers: activeTable ? activeTable.players.length : 0,
+        playerNames: activeTable ? activeTable.players.map(p => p.name) : []
       };
     });
 

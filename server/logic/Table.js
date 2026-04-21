@@ -415,6 +415,7 @@ export class Table {
     const totalPot = this.pots.reduce((sum, p) => sum + p.amount, 0);
     return {
       id: this.id,
+      maxPlayers: this.maxPlayers,
       gameState: this.gameState,
       communityCards: this.communityCards,
       pot: totalPot,
