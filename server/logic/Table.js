@@ -22,6 +22,7 @@ export class Table {
     this.winnerInfo = null;
     this.turnTimer = null;
     this.currentBet = this.bigBlind; 
+    this.previousBet = 0;
   }
 
   setUpdateCallback(cb) {
@@ -108,6 +109,7 @@ export class Table {
     this.communityCards = [];
     this.pots = [];
     this.currentBet = this.bigBlind;
+    this.previousBet = 0;
     this.winnerInfo = null;
     
     this.createDeck();
@@ -284,19 +286,25 @@ export class Table {
       p.hasActed = false;
     });
     this.currentBet = 0;
+    this.previousBet = 0;
   }
 
   nextPhase() {
     const activePlayers = this.players.filter(p => p.status === 'active');
     const allInPlayers = this.players.filter(p => p.status === 'all-in');
     
+    console.log(`Phase transition: ${this.currentPhase} -> ?`);
+    console.log(`Active players: ${activePlayers.length}, All-in players: ${allInPlayers.length}`);
+
     // If only one active player remains (others all-in or folded), we might go straight to showdown
     if (activePlayers.length <= 1 && allInPlayers.length > 0) {
+        console.log("Only one active player (or zero) with all-ins. Running out community cards.");
         // Run out community cards
         while (this.communityCards.length < 5) {
             if (this.communityCards.length === 0) this.communityCards = [this.deck.pop(), this.deck.pop(), this.deck.pop()];
             else this.communityCards.push(this.deck.pop());
         }
+        this.currentPhase = 'river';
         this.gameState = 'showdown';
         this.determineWinners();
         return;
@@ -348,7 +356,11 @@ export class Table {
       eligibleHands.sort((a, b) => HandEvaluator.compare(b.hand, a.hand));
 
       const winners = eligibleHands.filter(h => HandEvaluator.compare(h.hand, eligibleHands[0].hand) === 0);
-      const winAmount = Math.floor(pot.amount / winners.length);
+      
+      // Calcul du rake (5%)
+      const rake = Math.floor(pot.amount * 0.05);
+      const amountToDistribute = pot.amount - rake;
+      const winAmount = Math.floor(amountToDistribute / winners.length);
 
       winners.forEach(w => {
         const player = this.players.find(p => p.id === w.playerId);
@@ -409,7 +421,8 @@ export class Table {
       pots: this.pots,
       currentPhase: this.currentPhase,
       currentPlayerIndex: this.currentPlayerIndex,
-      currentBet: this.currentBet, // Add currentBet here
+      currentBet: this.currentBet,
+      previousBet: this.previousBet,
       winnerInfo: this.winnerInfo,
       players: this.players.map(p => ({
         id: p.id,

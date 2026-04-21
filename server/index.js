@@ -53,8 +53,12 @@ function setupTableCallbacks(table) {
   }
 }
 
+let onlinePlayers = 0;
+
 io.on('connection', (socket) => {
-  console.log('Un joueur s\'est connecté :', socket.id);
+  onlinePlayers++;
+  io.emit('onlineCount', onlinePlayers);
+  console.log('Un joueur s\'est connecté :', socket.id, 'Total:', onlinePlayers);
 
   socket.on('joinTable', async ({ tableId, playerName, buyIn }) => {
     let table = tableManager.getTable(tableId);
@@ -102,9 +106,28 @@ io.on('connection', (socket) => {
       // Check if player is already at the table
       const existingPlayer = table.players.find(p => p.name === playerName);
       if (existingPlayer) {
-        console.log(`Reconnexion de ${playerName} (Mise à jour Socket ID)`);
+        const addAmount = parseInt(buyIn) || 0;
+        if (addAmount > 0) {
+            if (parseFloat(user.Solde.montant) < addAmount) {
+                return socket.emit('error', { message: `Solde insuffisant pour recharger. Vous avez ${user.Solde.montant} MGA` });
+            }
+            // Déduire du solde et ajouter aux jetons
+            user.Solde.montant = parseFloat(user.Solde.montant) - addAmount;
+            await user.Solde.save();
+            existingPlayer.chips += addAmount;
+            console.log(`Recharge de ${playerName}: +${addAmount} MGA. Nouveaux jetons: ${existingPlayer.chips}`);
+        }
+        
+        console.log(`Reconnexion/Recharge de ${playerName} (Socket ID mis à jour)`);
         existingPlayer.id = socket.id;
         socket.join(tableId);
+
+        // Si la table était en attente, on vérifie si on peut lancer une main
+        if (table.gameState === 'waiting' && table.players.filter(p => p.chips > 0).length >= 2) {
+            console.log(`Lancement automatique de la main après recharge de ${playerName}`);
+            table.startHand();
+        }
+
         broadcastTableState(table);
         return;
       }
@@ -197,8 +220,18 @@ io.on('connection', (socket) => {
     broadcastTableState(table);
   });
 
+  socket.on('chatMessage', ({ tableId, playerName, message }) => {
+    io.to(tableId).emit('newChatMessage', {
+      playerName,
+      message,
+      timestamp: Date.now()
+    });
+  });
+
   socket.on('disconnect', async () => {
-    console.log('Joueur déconnecté :', socket.id);
+    onlinePlayers--;
+    io.emit('onlineCount', onlinePlayers);
+    console.log('Joueur déconnecté :', socket.id, 'Total:', onlinePlayers);
     const tables = tableManager.getAllTables();
     for (const table of tables) {
       const result = table.removePlayer(socket.id);
