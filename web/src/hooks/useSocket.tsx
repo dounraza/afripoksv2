@@ -1,9 +1,21 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = 'http://localhost:3001';
 
-export const useSocket = () => {
+// On définit le type du contexte correctement
+interface SocketContextType {
+  socket: Socket | null;
+  tableData: any;
+  error: string | null;
+  joinTable: (playerName: string, tableId: string, buyIn: string) => void;
+  leaveTable: () => void;
+  sendAction: (action: string, amount?: number) => void;
+}
+
+const SocketContext = createContext<SocketContextType | null>(null);
+
+export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [tableData, setTableData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,5 +59,17 @@ export const useSocket = () => {
     }
   }, [socket, joinedTableId]);
 
-  return { socket, tableData, error, joinTable, leaveTable, sendAction };
+  return (
+    <SocketContext.Provider value={{ socket, tableData, error, joinTable, leaveTable, sendAction }}>
+      {children}
+    </SocketContext.Provider>
+  );
+};
+
+export const useSocket = () => {
+  const context = useContext(SocketContext);
+  if (!context) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
 };

@@ -34,7 +34,7 @@ Améliore l’expérience utilisateur sans bloquer le lancement.
 
 * **1** – Nombre de joueurs en ligne
 * **2** – Nombre de joueurs par table
-* **12** – Chat entre joueurs
+* **12** – Chat entre joueurs dans une table a son conversation
 
 👉 **Objectif :** Rendre la plateforme vivante et interactive
 
