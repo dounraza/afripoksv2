@@ -20,7 +20,7 @@ interface PlayerSlotProps {
 }
 
 export const PlayerSlot: React.FC<PlayerSlotProps> = ({ 
-  player, isActive, isWinner, positionClass, shouldGatherBets, dealOrigin, isDealer, seatNumber, isShowdown,
+  player, isActive, isWinner, positionClass, shouldGatherBets, dealOrigin, isDealer, isShowdown,
   dealOrder, numPlayers, handKey, isCurrentUser, gameState
 }) => {
   const avatarUrl = `https://api.dicebear.com/9.x/adventurer/svg?seed=${player.name}&radius=50`;
@@ -63,32 +63,50 @@ export const PlayerSlot: React.FC<PlayerSlotProps> = ({
       {/* Bet Chips - Positioned above */}
       <BetChips amount={player.bet} shouldGather={shouldGatherBets} />
 
+      {/* Action Text Badge - ABOVE CARDS (Only for current user) */}
+      {isCurrentUser && player.lastAction && (
+        <div className={`px-4 py-1.5 rounded-full text-[14px] font-black uppercase italic shadow-[0_0_20px_rgba(0,0,0,0.5)] z-50 border-2 whitespace-nowrap mb-2 animate-bounce
+          ${player.lastAction === 'fold' ? 'bg-red-600 text-white border-red-400' : 
+            player.lastAction === 'all-in' ? 'bg-purple-600 text-white border-purple-400 animate-pulse' :
+            'bg-yellow-500 text-black border-yellow-300'}`}>
+          {player.lastAction}
+        </div>
+      )}
+
       {/* Player Cards - Sequential distribution animation */}
-      <div key={handKey} className="flex -space-x-10 -mb-14 h-24 items-end z-10 ml-4 perspective-1000">
+      <div key={handKey} className="flex -space-x-10 -mb-14 h-24 items-end z-10 ml-4 perspective-1000 relative">
         {showCards && (player.cards && player.cards.length > 0 ? player.cards : [null, null]).map((card: any, idx: number) => {
           const delay = (idx * numPlayers + (dealOrder - 1)) * 300;
           return (
             <div 
               key={idx} 
               className="animate-card-deal scale-[0.6] origin-bottom shadow-2xl transition-transform duration-300 hover:scale-75 hover:-translate-y-2"
-              style={{ 
-                '--deal-x': dealOrigin.x, 
-                '--deal-y': dealOrigin.y, 
+              style={{
+                '--deal-x': dealOrigin.x,
+                '--deal-y': dealOrigin.y,
                 animationDelay: `${delay}ms`,
-                zIndex: idx
-              } as any}
+                zIndex: idx,
+              } as React.CSSProperties}
             >
-              <div className="relative preserve-3d">
-                <Card 
-                  value={card?.value || ''} 
-                  suit={card?.suit || ''} 
-                  revealed={isRevealed || isShowdown} 
-                  hidden={!card && !isRevealed && !isShowdown}
-                />
-              </div>
+              <Card 
+                value={card?.value || ''} 
+                suit={card?.suit || ''} 
+                revealed={isRevealed || isShowdown} 
+                hidden={!card && !isRevealed && !isShowdown}
+              />
             </div>
-          );
-        })}
+          );        })}
+
+        {/* Action Text Overlay - Centered over all cards (Only for opponents) */}
+        {!isCurrentUser && player.lastAction && !isShowdown && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none -ml-4 -mt-2">
+            <span className={`text-[22px] font-black uppercase tracking-tighter italic drop-shadow-[0_4px_4px_rgba(0,0,0,1)] 
+              [text-shadow:_2px_2px_0_rgb(0,0,0),_-1px_-1px_0_rgb(0,0,0),_1px_-1px_0_rgb(0,0,0),_-1px_1px_0_rgb(0,0,0)]
+              ${player.lastAction === 'fold' ? 'text-red-600' : 'text-yellow-400'}`}>
+              {player.lastAction}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* MAIN SLOT BOX */}

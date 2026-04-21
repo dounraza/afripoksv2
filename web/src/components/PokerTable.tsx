@@ -3,6 +3,7 @@ import { PlayerSlot } from './PlayerSlot';
 import { Card } from './Card';
 import { ChipPot } from './ChipPot';
 import { Chat } from './Chat';
+import { EmptySlot } from './EmptySlot';
 import { useSocket } from '../hooks/useSocket';
 
 interface PokerTableProps {
@@ -13,15 +14,15 @@ interface PokerTableProps {
 }
 
 const POSITIONS_HORIZONTAL = [
-  'bottom-[-12%] left-[50%] -translate-x-1/2',
-  'bottom-[25%] left-[-4%]',
+  'bottom-[-10%] left-[50%] -translate-x-1/2',
+  'bottom-[15%] left-[-4%]',
   'top-[25%] left-[-4%]',
   'top-[-2%] left-[10%]',
-  'top-[-15%] left-[40%]',
-  'top-[-15%] right-[40%]',
+  'top-[-15%] left-[35%] -translate-x-1/2',
+  'top-[-15%] right-[35%] translate-x-1/2',
   'top-[-2%] right-[10%]',
   'top-[25%] right-[-4%]',
-  'bottom-[25%] right-[-4%]',
+  'bottom-[15%] right-[-4%]',
 ];
 
 const POSITIONS_VERTICAL = [
@@ -30,10 +31,10 @@ const POSITIONS_VERTICAL = [
   'top-[32%] left-[-15%]',                   // Ancien Seat 3, remonté
   'top-[12%] left-[-12%]',                   // Ancien Seat 2, remonté
   'top-[-4%] left-[50%] -translate-x-1/2',
-  'top-[12%] right-[-12%]',                  // Seat 5 remonté
-  'top-[40%] right-[-15%]',
+  'top-[2%] right-[-6%]',                  // Seat 5 ajusté
+  'top-[32%] right-[-15%]',
   'bottom-[25%] right-[-12%]',
-  'bottom-[-4%] left-[75%] -translate-x-1/2',
+  'bottom-[2%] right-[6%]',
 ];
 
 export const PokerTable: React.FC<PokerTableProps> = ({ tableData, currentUserId, currentUserName, isVertical = true }) => {
@@ -155,16 +156,10 @@ export const PokerTable: React.FC<PokerTableProps> = ({ tableData, currentUserId
           </div>
         )}
 
-        {Array.from({ length: 9 }).map((_, idx) => (
-          <div key={`seat-marker-${idx}`} className={`absolute ${PLAYER_POSITIONS[idx]} pointer-events-none -z-10`}>
-            <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/5 flex items-center justify-center">
-              <span className="text-xl font-black text-white/5 italic">{idx}</span>
-            </div>
-          </div>
-        ))}
         {Array.from({ length: 9 }).map((_, idx) => {
           const player = players.find((p: any) => p.position === idx);
-          if (!player) return null;
+          if (!player) return <EmptySlot key={`empty-${idx}`} positionClass={PLAYER_POSITIONS[idx]} />;
+          
           const isWinner = winnerIds.includes(player.id) && isShowdown;
           const isDealer = player.id === players.find((p: any) => p.position === tableData.dealerIndex)?.id;
           const presentPositions = players.map((p: any) => p.position).sort((a, b) => a - b);

@@ -117,6 +117,7 @@ export class Table {
     
     this.players.forEach(p => {
       p.resetForNewHand();
+      p.lastAction = null;
       if (p.chips > 0) {
         p.cards = [this.deck.pop(), this.deck.pop()];
         p.status = 'active';
@@ -166,10 +167,12 @@ export class Table {
     switch (action) {
       case 'fold':
         player.status = 'folded';
+        player.lastAction = 'fold';
         break;
       case 'check':
         if (player.bet < this.currentBet) return { error: "Vous ne pouvez pas checker" };
         player.hasActed = true;
+        player.lastAction = 'check';
         break;
       case 'call':
         const callAmount = this.currentBet - player.bet;
@@ -177,9 +180,11 @@ export class Table {
           player.bet += player.chips;
           player.chips = 0;
           player.status = 'all-in';
+          player.lastAction = 'all-in';
         } else {
           player.chips -= callAmount;
           player.bet += callAmount;
+          player.lastAction = 'call';
         }
         player.hasActed = true;
         break;
@@ -198,8 +203,12 @@ export class Table {
         player.chips -= amountToAdd;
         player.bet = raiseTotal;
         this.currentBet = raiseTotal;
+        player.lastAction = 'raise';
         
-        if (player.chips === 0) player.status = 'all-in';
+        if (player.chips === 0) {
+            player.status = 'all-in';
+            player.lastAction = 'all-in';
+        }
         
         // Reset hasActed for others
         this.players.forEach(p => {
@@ -212,6 +221,7 @@ export class Table {
         player.bet += allInAmount;
         player.chips = 0;
         player.status = 'all-in';
+        player.lastAction = 'all-in';
         // If all-in amount is greater than current bet, it becomes the new current bet
         if (player.bet > this.currentBet) {
           this.currentBet = player.bet;
@@ -296,6 +306,11 @@ export class Table {
     console.log(`Phase transition: ${this.currentPhase} -> ?`);
     console.log(`Active players: ${activePlayers.length}, All-in players: ${allInPlayers.length}`);
 
+    // Réinitialiser les actions pour la nouvelle phase, sauf pour ceux qui ont foldé
+    this.players.forEach(p => {
+      if (p.status !== 'folded') p.lastAction = null;
+    });
+
     // If only one active player remains (others all-in or folded), we might go straight to showdown
     if (activePlayers.length <= 1 && allInPlayers.length > 0) {
         console.log("Only one active player (or zero) with all-ins. Running out community cards.");
@@ -346,15 +361,24 @@ export class Table {
       hand: HandEvaluator.evaluate([...p.cards, ...this.communityCards])
     }));
 
-    const results = [];
+    const consolidatedResults = {}; // playerId -> { amount, handName, name }
 
     // Distribute each pot
     for (const pot of this.pots) {
       if (pot.amount === 0) continue;
 
       const eligibleHands = playerHands.filter(ph => pot.eligiblePlayerIds.includes(ph.playerId));
-      eligibleHands.sort((a, b) => HandEvaluator.compare(b.hand, a.hand));
+      
+      if (eligibleHands.length === 0) continue;
 
+      if (eligibleHands.length === 1) {
+        // Return unmatched pot to the only eligible player (no rake)
+        const player = this.players.find(p => p.id === eligibleHands[0].playerId);
+        player.chips += pot.amount;
+        continue;
+      }
+
+      eligibleHands.sort((a, b) => HandEvaluator.compare(b.hand, a.hand));
       const winners = eligibleHands.filter(h => HandEvaluator.compare(h.hand, eligibleHands[0].hand) === 0);
       
       // Calcul du rake (5%)
@@ -365,16 +389,20 @@ export class Table {
       winners.forEach(w => {
         const player = this.players.find(p => p.id === w.playerId);
         player.chips += winAmount;
-        results.push({
-          playerId: player.id,
-          name: player.name,
-          amount: winAmount,
-          handName: HandEvaluator.getHandDescription(w.hand)
-        });
+        
+        if (!consolidatedResults[player.id]) {
+          consolidatedResults[player.id] = {
+            playerId: player.id,
+            name: player.name,
+            amount: 0,
+            handName: HandEvaluator.getHandDescription(w.hand)
+          };
+        }
+        consolidatedResults[player.id].amount += winAmount;
       });
     }
 
-    this.winnerInfo = results;
+    this.winnerInfo = Object.values(consolidatedResults);
     this.finishHand();
   }
 
@@ -432,6 +460,7 @@ export class Table {
         bet: p.bet,
         position: p.position,
         status: p.status,
+        lastAction: p.lastAction,
         cards: (p.id === playerId || this.gameState === 'showdown') ? p.cards : [],
         handResult: (this.gameState === 'showdown' && p.status !== 'folded') ? 
           HandEvaluator.getHandDescription(HandEvaluator.evaluate([...p.cards, ...this.communityCards])) : null

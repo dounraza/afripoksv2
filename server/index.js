@@ -25,7 +25,7 @@ app.use('/api/solde', soldeRoutes);
 // Initialiser la connexion DB et synchroniser les modèles
 connectDB().then(async () => {
   try {
-    await sequelize.sync({ alter: true });
+    await sequelize.sync(); // Retrait de { alter: true } pour éviter l'erreur de clés multiples
     console.log('Modèles synchronisés avec la base de données.');
   } catch (error) {
     console.error('Erreur lors de la synchronisation des modèles :', error);
